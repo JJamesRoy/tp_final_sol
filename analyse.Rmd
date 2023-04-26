@@ -3,7 +3,6 @@ library(tidyverse)
 library(tree)
 ```
 
-
 ```{r, warning=FALSE}
 dat = read.csv("data.csv")
 
@@ -37,7 +36,6 @@ high_corr_varnames <- unique(colnames(dat_full_clean)[high_corr_pairs[,2]])
 high_corr_varnames
 ```
 
-
 ```{r}
 dat_lm = dat_full_clean %>% 
   mutate(sexe = ifelse(sexe == 2,1, 0), # 1 si gars, 0 sinon
@@ -60,6 +58,7 @@ dat_lm = dat_full_clean %>%
          drog = round((drog1 + drog2 + drog3 +drog4)/4)) # 1 si consomme de la drogue (pour alcool, +1 car normal de boire une fois de l'alcool), 0 sinon
 
 dat_lm = dat_lm %>% select(-c("drog1", "drog2", "drog3", "drog4"))
+dat_lm_num = dat_lm
 
 sui1 = factor(dat_lm$sui1)
 dat_lm[,-c(1,17)] = sapply(dat_lm[,-c(1,17)], as.factor)
@@ -70,6 +69,7 @@ dat_lm[sapply(dat_lm, is.character)] <- lapply(dat_lm[sapply(dat_lm, is.characte
 tree.model <- tree(sui1 ~ ., dat_lm)
 summary(tree.model)
 ```
+
 ```{r}
 plot(tree.model)
 text(tree.model, pretty = 0)
@@ -83,6 +83,7 @@ tree.model
 set.seed(1)
 train <- sample(1:nrow(dat_lm), 152)
 test <- dat_lm[-train, ]
+test_num <- dat_lm[-train, ]
 sui1.test <- sui1[-train]
 tree.model <- tree(sui1 ~ ., dat_lm,
     subset = train)
@@ -91,12 +92,14 @@ tree.pred <- predict(tree.model, test,
 table(tree.pred, sui1.test)
 (56 + 34) / 152
 ```
+
 ```{r}
 set.seed(7)
 cv.model <- cv.tree(tree.model, FUN = prune.misclass)
 names(cv.model)
 cv.model
 ```
+
 ```{r}
 par(mfrow = c(1, 2))
 plot(cv.model$size, cv.model$dev, type = "b")
@@ -126,7 +129,7 @@ table(tree.pred, sui1.test)
 (64 + 30) / 152
 ```
 
-######BAGGING######
+## BAGGING
 
 ```{r}
 library(randomForest)
@@ -136,11 +139,55 @@ bag.model <- randomForest(sui1 ~ ., data = dat_lm,
 bag.model
 ```
 
+
 ```{r}
-dat.test <- dat_lm[-train, "sui1"]
-yhat.bag <- predict(bag.model, newdata = dat_lm[-train, ])
-plot(yhat.bag, dat.test)
-abline(0, 1)
-mean((yhat.bag - dat.test)^2)
+bag.pred <- predict(bag.model, test,
+    type = "class")
+table(bag.pred, sui1.test)
+(63 + 35) / 152
 ```
+
+```{r}
+bag.importance = as.data.frame(importance(bag.model))
+```
+
+```{r}
+p = round(sqrt(20))
+rf.model <- randomForest(sui1 ~ ., data = dat_lm,
+    subset = train, mtry = 4, importance = TRUE)
+rf.model
+```
+
+```{r}
+rf.pred <- predict(rf.model, test,
+    type = "class")
+table(rf.pred, sui1.test)
+(61 + 35) / 152
+```
+
+
+```{r}
+rf.importance = as.data.frame(importance(rf.model))
+```
+
+## BOOSTING
+
+```{r}
+library(gbm)
+set.seed(1)
+boost.model <- gbm(sui1 ~ ., data = dat_lm_num[train, ],
+    distribution = "bernoulli", n.trees = 5000,
+    interaction.depth = 4)
+
+summary(boost.model)
+```
+
+
+```{r}
+boost.pred <- predict(boost.model, newdata = dat_lm_num[-train,],
+    type = "response")
+table(round(boost.pred), sui1.test)
+(53 + 40) / 152
+```
+
 
