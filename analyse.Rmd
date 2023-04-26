@@ -1,8 +1,6 @@
 ```{r}
 library(tidyverse)
-library(fastDummies)
-library(glmnet)
-library(stargazer)
+library(tree)
 ```
 
 
@@ -44,27 +42,105 @@ high_corr_varnames
 dat_lm = dat_full_clean %>% 
   mutate(sexe = ifelse(sexe == 2,1, 0), # 1 si gars, 0 sinon
          sui1 = ifelse(sui1 == 1, 1, 0), # 1 si envie de suicide, 0 sinon
-         statmar = ifelse(statmar == 3, 0,1), #0 si parent divorcé
-         travp = ifelse(travp == 1, 1, 0), # 1 si pere travail temps plein, 0 sinon
-         scolp = ifelse(scolp == 4 | scolp == 5 | scolp == 6, 1, 0), # 1 si pere plus que sec 5, 0 sinon
-         travm = ifelse(travm == 1, 1, 0), # 1 si mere travail temps plein, 0 sinon
-         scolm = ifelse(scolm == 4 | scolm == 5 | scolm == 6, 1, 0), # 1 si mere plus que sec 5, 0 sinon
-         negp1 = ifelse(negp1 >= 2, 1, 0), # 1 si pere interessé, 0 sinon
-         negp8 = ifelse(negp8 >= 2, 1, 0), # 1 si pere aidé, 0 sinon
-         negp9 = ifelse(negp9 >= 2, 1, 0), # 1 si pere prend le temps de discuté, 0 sinon
-         negm1 = ifelse(negm1 >= 2, 1, 0), # 1 si mere interessé, 0 sinon,
-         negm8 = ifelse(negm8 >= 2, 1, 0), # 1 si mere aidé, 0 sinon,
-         negm9 = ifelse(negm9 >= 2, 1, 0), # 1 si mere prend le temps de discuté, 0 sinon, 
-         dets1 = ifelse(dets1 >= 2, 1, 0), # 1 si senti despéré, 0 sinon
-         metal = ifelse(mus2 >= 4, 1, 0), # 1 si aime le metal, 0 sinon
-         alien1 = ifelse(alien1 >=4, 1, 0), # 1 si pense que pas de but à être en vie, 0 sinon
-         alien2 = ifelse(alien2 >=4, 1, 0), # 1 si pense que bon à rien, 0 sinon
-         drog = ifelse(drog1 >= 3 | drog2 >= 2 | drog3 >= 2 | drog4 >= 2, 1, 0)) # 1 si consomme de la drogue (pour alcool, +1 car normal de boire une fois de l'alcool), 0 sinon
+#         statmar = ifelse(statmar == 3, 0,1), #0 si parent divorcé
+#         travp = ifelse(travp == 1, 1, 0), # 1 si pere travail temps plein, 0 sinon
+#         scolp = ifelse(scolp == 4 | scolp == 5 | scolp == 6, 1, 0), # 1 si pere plus que sec 5, 0 sinon
+#         travm = ifelse(travm == 1, 1, 0), # 1 si mere travail temps plein, 0 sinon
+#         scolm = ifelse(scolm == 4 | scolm == 5 | scolm == 6, 1, 0), # 1 si mere plus que sec 5, 0 sinon
+#         negp1 = ifelse(negp1 >= 2, 1, 0), # 1 si pere interessé, 0 sinon
+#         negp8 = ifelse(negp8 >= 2, 1, 0), # 1 si pere aidé, 0 sinon
+#         negp9 = ifelse(negp9 >= 2, 1, 0), # 1 si pere prend le temps de discuté, 0 sinon
+#         negm1 = ifelse(negm1 >= 2, 1, 0), # 1 si mere interessé, 0 sinon,
+#         negm8 = ifelse(negm8 >= 2, 1, 0), # 1 si mere aidé, 0 sinon,
+#         negm9 = ifelse(negm9 >= 2, 1, 0), # 1 si mere prend le temps de discuté, 0 sinon, 
+#         dets1 = ifelse(dets1 >= 2, 1, 0), # 1 si senti despéré, 0 sinon
+#         metal = ifelse(mus2 >= 4, 1, 0), # 1 si aime le metal, 0 sinon
+#         alien1 = ifelse(alien1 >=4, 1, 0), # 1 si pense que pas de but à être en vie, 0 sinon
+#         alien2 = ifelse(alien2 >=4, 1, 0), # 1 si pense que bon à rien, 0 sinon
+         drog = round((drog1 + drog2 + drog3 +drog4)/4)) # 1 si consomme de la drogue (pour alcool, +1 car normal de boire une fois de l'alcool), 0 sinon
 
-dat_lm = dat_lm %>% select(-c('mus2', "drog1", "drog2", "drog3", "drog4"))
+dat_lm = dat_lm %>% select(-c("drog1", "drog2", "drog3", "drog4"))
+
+sui1 = factor(dat_lm$sui1)
+dat_lm[,-c(1,17)] = sapply(dat_lm[,-c(1,17)], as.factor)
+dat_lm[sapply(dat_lm, is.character)] <- lapply(dat_lm[sapply(dat_lm, is.character)], as.factor)
 ```
 
 ```{r}
+tree.model <- tree(sui1 ~ ., dat_lm)
+summary(tree.model)
+```
+```{r}
+plot(tree.model)
+text(tree.model, pretty = 0)
+```
 
+```{r}
+tree.model
+```
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(dat_lm), 152)
+test <- dat_lm[-train, ]
+sui1.test <- sui1[-train]
+tree.model <- tree(sui1 ~ ., dat_lm,
+    subset = train)
+tree.pred <- predict(tree.model, test,
+    type = "class")
+table(tree.pred, sui1.test)
+(56 + 34) / 152
+```
+```{r}
+set.seed(7)
+cv.model <- cv.tree(tree.model, FUN = prune.misclass)
+names(cv.model)
+cv.model
+```
+```{r}
+par(mfrow = c(1, 2))
+plot(cv.model$size, cv.model$dev, type = "b")
+plot(cv.model$k, cv.model$dev, type = "b")
+```
+
+```{r}
+prune.model <- prune.misclass(tree.model, best = 3)
+plot(prune.model)
+text(prune.model, pretty = 0)
+```
+
+```{r}
+tree.pred <- predict(prune.model, test,
+    type = "class")
+table(tree.pred, sui1.test)
+(63 + 39) / 152
+```
+
+```{r}
+prune.model <- prune.misclass(tree.model, best = 7)
+plot(prune.model)
+text(prune.model, pretty = 0)
+tree.pred <- predict(prune.model, test,
+    type = "class")
+table(tree.pred, sui1.test)
+(64 + 30) / 152
+```
+
+######BAGGING######
+
+```{r}
+library(randomForest)
+set.seed(123321)
+bag.model <- randomForest(sui1 ~ ., data = dat_lm,
+    subset = train, mtry = 20, importance = TRUE)
+bag.model
+```
+
+```{r}
+dat.test <- dat_lm[-train, "sui1"]
+yhat.bag <- predict(bag.model, newdata = dat_lm[-train, ])
+plot(yhat.bag, dat.test)
+abline(0, 1)
+mean((yhat.bag - dat.test)^2)
 ```
 
