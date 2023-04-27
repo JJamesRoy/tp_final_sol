@@ -76,12 +76,8 @@ text(tree.model, pretty = 0)
 ```
 
 ```{r}
-tree.model
-```
-
-```{r}
 set.seed(1)
-train <- sample(1:nrow(dat_lm), 152)
+train <- sample(1:nrow(dat_lm), 210)
 test <- dat_lm[-train, ]
 test_num <- dat_lm[-train, ]
 sui1.test <- sui1[-train]
@@ -90,11 +86,10 @@ tree.model <- tree(sui1 ~ ., dat_lm,
 tree.pred <- predict(tree.model, test,
     type = "class")
 table(tree.pred, sui1.test)
-(56 + 34) / 152
+(32 + 23) / 94
 ```
 
 ```{r}
-set.seed(7)
 cv.model <- cv.tree(tree.model, FUN = prune.misclass)
 names(cv.model)
 cv.model
@@ -107,7 +102,7 @@ plot(cv.model$k, cv.model$dev, type = "b")
 ```
 
 ```{r}
-prune.model <- prune.misclass(tree.model, best = 3)
+prune.model <- prune.misclass(tree.model, best = 6)
 plot(prune.model)
 text(prune.model, pretty = 0)
 ```
@@ -116,27 +111,29 @@ text(prune.model, pretty = 0)
 tree.pred <- predict(prune.model, test,
     type = "class")
 table(tree.pred, sui1.test)
-(63 + 39) / 152
+(34 + 26) / 94
 ```
 
 ```{r}
-prune.model <- prune.misclass(tree.model, best = 7)
+prune.model <- prune.misclass(tree.model, best = 8)
 plot(prune.model)
 text(prune.model, pretty = 0)
 tree.pred <- predict(prune.model, test,
     type = "class")
 table(tree.pred, sui1.test)
-(64 + 30) / 152
+(36 + 23) / 94
 ```
+
+
 
 ## BAGGING
 
 ```{r}
 library(randomForest)
-set.seed(123321)
 bag.model <- randomForest(sui1 ~ ., data = dat_lm,
     subset = train, mtry = 20, importance = TRUE)
 bag.model
+plot(bag.model)
 ```
 
 
@@ -144,11 +141,12 @@ bag.model
 bag.pred <- predict(bag.model, test,
     type = "class")
 table(bag.pred, sui1.test)
-(63 + 35) / 152
+(36 + 29) / 94
 ```
 
 ```{r}
 bag.importance = as.data.frame(importance(bag.model))
+varImpPlot(bag.model, type = 2)
 ```
 
 ```{r}
@@ -156,18 +154,20 @@ p = round(sqrt(20))
 rf.model <- randomForest(sui1 ~ ., data = dat_lm,
     subset = train, mtry = 4, importance = TRUE)
 rf.model
+plot(rf.model)
 ```
 
 ```{r}
 rf.pred <- predict(rf.model, test,
     type = "class")
 table(rf.pred, sui1.test)
-(61 + 35) / 152
+(40 + 26) / 94
 ```
 
 
 ```{r}
 rf.importance = as.data.frame(importance(rf.model))
+varImpPlot(rf.model, type = 2)
 ```
 
 ## BOOSTING
@@ -187,7 +187,7 @@ summary(boost.model)
 boost.pred <- predict(boost.model, newdata = dat_lm_num[-train,],
     type = "response")
 table(round(boost.pred), sui1.test)
-(53 + 40) / 152
+(32 + 26) / 94
 ```
 
 
